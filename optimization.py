@@ -8,7 +8,7 @@ import optax
 import tqdm
 from scipy.stats import binned_statistic
 
-cmb_map = np.loadtxt('maps/cmb_map_with_noise.dat') * 1.0
+cmb_map = np.loadtxt('maps/cmb_map_with_noise.dat')
 ksz_map = np.loadtxt('maps/ksz_map.dat') #np.loadtxt('maps/ksz_map.dat')
 temp_map = np.loadtxt('maps/template_map.dat') #np.loadtxt('maps/template_map.dat')
 
@@ -127,7 +127,7 @@ def compute_loss(pixels_and_biases):
     return (loss2 + loss1)
     '''
 
-    prior = jnp.sum((amplitudes-means)**2/2/stds**2) #+ boxcar(phases, 0, 2*np.pi)
+    #prior = jnp.sum((amplitudes-means)**2/2/stds**2) 
     loss = jnp.sum(jnp.abs(cmb_fourier-kSZ_model_fourier)**2/2/stds**2)
 
     #debug test loss
@@ -184,7 +184,9 @@ print("Optimal loss: ", compute_loss(params)) # should be ~0 if cmb and noise ar
 
 
 key = jax.random.PRNGKey(42)
-start_learning_rate = 5e-4
+start_learning_rate = 5e-5
+
+#sch = optax.schedules.cosine_decay_schedule(start_learning_rate, 10_000, alpha=1e-4)
 
 #optimizer = optax.adam(start_learning_rate)
 #optimimzer = optax.lbfgs(start_learning_rate)
@@ -201,7 +203,9 @@ params = jnp.zeros(N**2+4)
 #params = params.at[:N*(N//2+1)].set(initial_amp)
 #params = params.at[N*(N//2+1):2*N*(N//2+1)].set(initial_phases)
 #params = params.at[2*N*(N//2+1)].set(1.) # bG2 needs to be low
-params = params.at[:N**2].set(jnp.ravel(cmb_map) + jnp.array(np.random.normal(0., cmb_map.std()/100, size=N**2)))
+
+params = params.at[:N**2].set(jnp.ravel(cmb_map) + jnp.array(np.random.normal(0., cmb_map.std()/10, size=N**2))-jnp.ravel(temp_map))
+
 params = params.at[N**2].set(1.)
 print(params[N**2:])
 loss_ini = compute_loss(params)
@@ -209,8 +213,8 @@ print(loss_ini)
 opt_state = optimizer.init(params)
 
 # A simple update loop.
-N_epochs_adam = 100_000
-N_epochs_bfgs = 10_000
+N_epochs_adam = 350_000
+N_epochs_bfgs = 0_000
 N_epochs = N_epochs_adam + N_epochs_bfgs
 losses = np.zeros(N_epochs)
 for i in tqdm.tqdm(range(N_epochs_adam)):
@@ -219,7 +223,7 @@ for i in tqdm.tqdm(range(N_epochs_adam)):
     params = optax.apply_updates(params, updates)
     if losses[i] == np.min(losses[losses!=0.]):
         opt_params = params
-
+'''
 optimimzer = optax.lbfgs(1e-3)
 
 for i in tqdm.tqdm(range(N_epochs_bfgs)):
@@ -228,6 +232,7 @@ for i in tqdm.tqdm(range(N_epochs_bfgs)):
     params = optax.apply_updates(params, updates)
     if losses[i] == np.min(losses[losses!=0.]):
         opt_params = params
+'''
 
 '''
 plt.imshow(ksz_map)

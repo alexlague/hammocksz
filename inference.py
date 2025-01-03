@@ -68,7 +68,7 @@ def model():
         phases_fourier = numpyro.sample('phi', dist.Uniform(-jnp.pi, jnp.pi))
         
     with numpyro.plate('B', 4):
-        biases = numpyro.sample('biases', dist.Uniform(-2, 2))
+        biases = numpyro.sample('biases', dist.Uniform(-3, 3))
 
     #pixels_map = jnp.reshape(pix, (N, N))
     
@@ -91,7 +91,7 @@ if run_hmc:
     # need to split the key for jax's random implementation
     rng_key = jax.random.PRNGKey(0)
     rng_key, rng_key_ = jax.random.split(rng_key)
-    ini_noise = jnp.array(np.random.normal(cmb_map.mean(), cmb_map.std()/2.5, size=cmb_map.shape))
+    ini_noise = jnp.array(np.random.normal(cmb_map.mean(), cmb_map.std()/5, size=cmb_map.shape))
     ini_noise_fourier = jnp.fft.rfft(ini_noise)
     ini_fourier = jnp.ravel(cmb_fourier + ini_noise_fourier)  
     inisample = {"pix":jnp.abs(ini_fourier), "phi":jnp.angle(ini_fourier), "biases":jnp.array([1.0, 0., 0., 0.])}
@@ -100,7 +100,7 @@ if run_hmc:
     # run HMC with NUTS
     #ernel = HMC(model, target_accept_prob=0.8,  init_strategy = numpyro.infer.util.init_to_value(values=inisample))
     kernel = NUTS(model, target_accept_prob=0.7, init_strategy = numpyro.infer.util.init_to_value(values=inisample))
-    mcmc = MCMC(kernel, num_warmup=200, num_samples=2000)
+    mcmc = MCMC(kernel, num_warmup=500, num_samples=5000)
     mcmc.run(rng_key_, )#cmb=cmb_map, temp=temp_map, err=err) #x=x, y=y, y_err=y_err)
     mcmc.print_summary()
     
@@ -108,7 +108,8 @@ if run_hmc:
 
     #np.savetxt('maps/hmc_out_map.dat', pixels_out.reshape(N, N))
 
-    
+    samples = mcmc.get_samples()["biases"]
+    np.savetxt('maps/hmc_bias_samples.dat', samples)
     
 if do_plot:
     import matplotlib.pyplot as plt
